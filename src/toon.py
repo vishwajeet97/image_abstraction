@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import lic.lic_internal
+import src.util as util
 
 class Toon:
 	def __init__(self, image, config):
@@ -8,18 +8,34 @@ class Toon:
 		self.config = config
 
 	def ETF(self):
-		gray_img = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
-		sobelx = cv2.Sobel(gray_img,cv2.CV_64F,1,0,ksize=5)
-		sobely = cv2.Sobel(gray_img,cv2.CV_64F,0,1,ksize=5)
+		def clip(x, lo, hi):
+			return max(lo, min(x, hi))
+		smoothen_image = cv2.GaussianBlur(self.image, (3,3), 0, 0, cv2.BORDER_DEFAULT)
+		gray_img = cv2.cvtColor(smoothen_image, cv2.COLOR_BGR2GRAY)
+		sobelx = cv2.Sobel(gray_img,cv2.CV_32F,1,0,ksize=5)
+		sobely = cv2.Sobel(gray_img,cv2.CV_32F,0,1,ksize=5)
 		mag = np.sqrt(sobelx**2 + sobely**2)
-		KERNEL_SIZE = 5
-		texture = np.random.rand(sobelx.shape(0),sobelx.shape(1)).astype(np.float32)
-		kernellen=31
-		kernel = np.sin(np.arange(kernellen)*np.pi/kernellen)
-		kernel = kernel.astype(np.float32)
-		lic_internal.line_integral_convolution(np.stack(sobelx,sobely,axis=2), texture, kernel)
-		return sobely
+		mag = cv2.normalize(mag, None, alpha=0.0, beta=1.0, norm_type=cv2.NORM_MINMAX)
 
+		KERNEL_SIZE = 5
+		KSby2 = int((KERNEL_SIZE - 1)/2)
+		H, W, C = self.image.shape
+
+		vector_field = np.stack([sobelx, sobely], axis=2)
+		print(sobelx)
+		print(sobely)
+		util.view_vf(vector_field)
+		return sobelx
+		# updated_vf = np.zeros(vector_field.shape)
+
+		# for i in range(self.image.shape[0]):
+		# 	for j in range(self.image.shape[1]):
+		# 		min_x, max_x = max(i-KSby2,0), min(i+KSby2+1, H)
+		# 		min_y, max_y = max(j-KSby2,0), min(j+KSby2+1, W)
+				 
+		# 		patch = vector_field[min_x:max_x, min_y:max_y]
+		# 		patch_mag = mag[min_x:max_x, min_y:max_y]
+				
 	def run(self):
 		etf = self.ETF()
 		return etf
