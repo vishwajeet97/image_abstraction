@@ -19,6 +19,8 @@ class Toon:
 		KSby2 = int((KERNEL_SIZE - 1)/2)
 		H, W = self.image.shape
 
+		indices = np.indices([H, W]).transpose((1,2,0))
+
 		vector_field = np.stack([sobelx, sobely], axis=2)
 		updated_vf = np.zeros(vector_field.shape)
 
@@ -29,8 +31,15 @@ class Toon:
 				 
 				patch = vector_field[min_x:max_x, min_y:max_y]
 				patch_mag = mag[min_x:max_x, min_y:max_y]
-				
+				patch_indices = indices[:, min_x:max_x, min_y:max_y]
 
+				ws = np.linalg.norm(patch_indices - indices[:, i, j], axis=2)
+				ws = np.where(ws > config.etf_radius, 0.0, 1.0)
+				wd = np.einsum('ijk,k->ij', patch, vector_field[i][j])
+				wm = (patch_mag - mag[i][j] + 1)/2
+
+				filt = np.multiply(np.multiply(ws, wd), wm)
+				updated_vf[i][j] = config.etf_k * np.sum(np.einsum('ijk,ij->ijk', patch, filt), axis=(0,1))
 
 	def run(self):
 		etf = self.ETF()
