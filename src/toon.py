@@ -10,28 +10,29 @@ class Toon:
 	def ETF(self):
 		def clip(x, lo, hi):
 			return max(lo, min(x, hi))
-		smoothen_image = cv2.GaussianBlur(self.image, (3,3), 0, 0, cv2.BORDER_DEFAULT)
+		smoothen_image = cv2.GaussianBlur(self.image, (5,5), 0, 0, cv2.BORDER_DEFAULT)
 		gray_img = cv2.cvtColor(smoothen_image, cv2.COLOR_BGR2GRAY)
 		sobelx = cv2.Sobel(gray_img,cv2.CV_32F,1,0,ksize=3)
 		sobely = cv2.Sobel(gray_img,cv2.CV_32F,0,1,ksize=3)
-		mag = np.sqrt(sobelx**2 + sobely**2)
-		mag = cv2.normalize(mag, None, alpha=0.0, beta=1.0, norm_type=cv2.NORM_MINMAX)
 
-		KERNEL_SIZE = 5
+		mag, angle = cv2.cartToPolar(sobelx, sobely, magnitude=None, angle=None, angleInDegrees=True)
+		mag = cv2.normalize(mag, None, alpha=0.0, beta=1.0, norm_type=cv2.NORM_MINMAX)
+		angle = (angle + 90) % 360
+		x, y = cv2.polarToCart(mag, angle, x=None, y=None, angleInDegrees=True)
+		vector_field = np.stack([x, y], axis=2)
+
+		KERNEL_SIZE = 9
 		KSby2 = int((KERNEL_SIZE - 1)/2)
 		H, W, C = self.image.shape
 
 		indices = np.indices([H, W]).transpose((1,2,0))
 
-		vector_field = np.stack([sobelx, sobely], axis=2)
-		# print(sobelx)
-		# print(sobely)
 		ite = 0
 		util.view_vf(vector_field,ite)
 		ite += 1
-		updated_vf = np.zeros(vector_field.shape)
 
 		for iter_no in range(3):
+			updated_vf = np.zeros(vector_field.shape)
 			for i in range(self.image.shape[0]):
 				for j in range(self.image.shape[1]):
 					min_x, max_x = max(i-KSby2,0), min(i+KSby2+1, H)
@@ -50,10 +51,12 @@ class Toon:
 					norm = np.linalg.norm(updated_vf[i][j])
 					if norm != 0:
 						updated_vf[i][j] = updated_vf[i][j]/norm
-			print(updated_vf)
+			# print(updated_vf)
 			util.view_vf(updated_vf,ite)
+			vector_field = updated_vf
 			ite += 1
-		return sobelx
+
+		return updated_vf
 
 	def run(self):
 		etf = self.ETF()
