@@ -1,3 +1,4 @@
 {
-	"version": "baseline"
+	"version": "baseline",
+	"etf_radius": 5
 }
