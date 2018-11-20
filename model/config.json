@@ -2,9 +2,9 @@
 	"version": "baseline",
 	"etf_radius": 5,
 	"etf_iterations": 3,
-	"fdog_iterations": 1,
+	"fdog_iterations": 3,
 	"sigma_m": 3.0,
 	"sigma_c": 1.0,
 	"rho": 0.997,
-	"fdog_threshold": 0.5
+	"fdog_threshold": 1
 }

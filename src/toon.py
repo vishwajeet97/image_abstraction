@@ -12,10 +12,11 @@ class Toon:
 	def gaussian(self, point, sigma): # eqn (7) in paper #TODO:use some librart
 		# print(point)
 		# print(sigma)
-		return math.exp(-(point**2)/(2*(sigma**2)))/(math.sqrt(2*math.pi*sigma))
+		print(sigma)
+		return math.exp(-(point**2)/(2*(sigma**2)))/(math.sqrt(2*math.pi)*sigma)
 
 	def edge_dog(self, t, sigma_c, p): # eqn (8) in paper
-		return self.gaussian(t, sigma_c) - p * self.gaussian(t, 1.05*sigma_c)
+		return self.gaussian(t, sigma_c) - p * self.gaussian(t, 1.6*sigma_c)
 
 	def getPointsOnLine(self, slope, size): #1X1 3X3 5X5 7X7
 		points = np.zeros((size,2))
@@ -45,14 +46,26 @@ class Toon:
 
 		return points
 
+	def getNextPointOnCurve(self, slope): #1X1 3X3 5X5 7X7
+		point = np.zeros((2))
+		if abs(slope)<=1:
+			point[0] = 1
+			point[1] = math.floor(slope+0.5)
+		else:
+			slope_ = 1/slope
+			point[1] = 1
+			point[0] = math.floor(slope_+0.5)
+		return point
+
 	def getF(self,size): #1X1 3X3 5X5 7X7
 		sigma_c = self.config.sigma_c
 		p = self.config.rho
 		points = np.zeros((size))
 		points[0] = self.edge_dog(0,sigma_c,p)
 		for i in range(1, size//2 + 1):
-			# print(i)
+			print(i)
 			points[i] = self.edge_dog(i,sigma_c,p); #repititive calc TODO
+			print(points[i])
 			points[size-i] = points[i]
 		return points
 
@@ -72,33 +85,53 @@ class Toon:
 		updated_fdog = np.zeros(fdog.shape)
 		M = self.image.shape[0]
 		N = self.image.shape[1]
+		kernel_size = 7 #7? need to fix the size acc. to sigma_c
+		f = self.getF(kernel_size)
+		g = self.getG(kernel_size)
+		print(f)
+		print(g)
 		for iter_no in range(self.config.fdog_iterations):
 			Hg = np.zeros(fdog.shape)
 			for i in range(M):
 				for j in range(N):
 					t0 = self.etf[i][j]
 					direc = math.atan2(t0[0],-t0[1]);
-					kernel_size = 7 #7? need to fix the size acc. to sigma_c
 					points = self.getPointsOnLine(direc, kernel_size).astype(np.int)
-					f = self.getF(kernel_size)
 					# print(f)
 					ty = [1 if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					I = [fdog[i+p[0]][j+p[1]] if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					Hg[i][j] = np.sum(I*f)/np.sum(f*ty)
-					if(Hg[i][j]) < 0:
-						print("YES")
+					# if(Hg[i][j]) < 0:
+						# print("YES")
 			print(np.sum(np.array(Hg) < 0))
 			He = np.zeros(fdog.shape)
 			for i in range(M):
 				for j in range(N):
-					t0 = self.etf[i][j]
-					direc = math.atan2(t0[1],t0[0]);
-					kernel_size = 7 #7? need to fix the size acc. to sigma_c
-					points = self.getPointsOnLine(direc, kernel_size).astype(np.int)
-					g = self.getG(kernel_size)
-					ty = [1 if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
-					H = [Hg[i+p[0]][j+p[1]] if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
-					val = np.sum(H*g)/np.sum(g*ty)
+					point = np.array([i,j])
+					H = Hg[point[0]][point[1]]*g[0]
+					G = g[0]
+					for s in range(1,4):
+						s_etf = self.etf[point[0]][point[1]]
+						direc = math.atan2(s_etf[1],s_etf[0])
+						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
+						point = point + p_delta
+						if point[0]<M and point[0]>=0 and point[1]<N and point[1]>=0:
+							H += Hg[point[0]][point[1]]*g[s]
+							G += g[s]
+						else:
+							break
+					point = np.array([i,j])
+					for s in range(1,4):
+						s_etf = self.etf[point[0]][point[1]]
+						direc = math.atan2(-s_etf[1],-s_etf[0])
+						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
+						point = point + p_delta
+						if point[0]<M and point[0]>=0 and point[1]<N and point[1]>=0:
+							H += Hg[point[0]][point[1]]*g[s]
+							G += g[s]
+						else:
+							break
+					val = H/G
 					# print(val)
 					if val<0 and 1+np.tanh(val) < self.config.fdog_threshold:
 						He[i][j] = 0
@@ -106,20 +139,22 @@ class Toon:
 						He[i][j] = 255
 			print(np.sum(np.array(He) > 0))
 			updated_fdog = He
-			fdog = np.minimum(updated_fdog, img)
+			fdog = np.minimum(updated_fdog/255, img)
+
+			plt.bone()
+			plt.clf()
+			plt.axis('off')
+			plt.figimage(updated_fdog)
+			dpi = 100
+			print(updated_fdog.shape)
+			plt.gcf().set_size_inches((updated_fdog.shape[1]/float(dpi),updated_fdog.shape[0]/float(dpi)))
+			plt.savefig("fdog_iter"+str(iter_no)+".png",dpi=dpi) 
 		# cv2.imshow('image',updated_fdog)
 		# # cv2.imshow('abstract_image',abstract_image)
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
 
-		plt.bone()
-		plt.clf()
-		plt.axis('off')
-		plt.figimage(updated_fdog)
-		dpi = 100
-		print(updated_fdog.shape)
-		plt.gcf().set_size_inches((updated_fdog.shape[1]/float(dpi),updated_fdog.shape[0]/float(dpi)))
-		plt.savefig("fdog_iter"+str(1)+".png",dpi=dpi) 
+		
 
 		self.fdog = updated_fdog
 

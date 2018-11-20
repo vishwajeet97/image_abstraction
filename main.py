@@ -12,9 +12,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Take in the path to config file')
     parser.add_argument("--config_path", type=str, default="model/config.json",
                         help='path to the config file stored in json')
-    parser.add_argument("--image_path", type=str, default="data/parrot.jpg",
+    parser.add_argument("--image_path", type=str, default="data/albert-einstein.jpg",
                         help='path to the image')
-    parser.add_argument("--result_path", type=str, default="result/parrot.jpg",
+    parser.add_argument("--result_path", type=str, default="result/albert-einstein.jpg",
                         help='path to the store location of the abstracted image')
     
     args = parser.parse_args()
