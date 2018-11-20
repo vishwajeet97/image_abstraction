@@ -12,9 +12,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Take in the path to config file')
     parser.add_argument("--config_path", type=str, default="model/config.json",
                         help='path to the config file stored in json')
-    parser.add_argument("--image_path", type=str, default="data/albert-einstein.jpg",
+    parser.add_argument("--image_path", type=str, default="data/parrot.jpg",
                         help='path to the image')
-    parser.add_argument("--result_path", type=str, default="result/albert-einstein.jpg",
+    parser.add_argument("--result_path", type=str, default="result/parrot.jpg",
                         help='path to the store location of the abstracted image')
     
     args = parser.parse_args()
@@ -26,6 +26,6 @@ if __name__ == "__main__":
     abstract_image = toon.run()
 
     cv2.imshow('image',image)
-    cv2.imshow('abstract_image',abstract_image)
+    # cv2.imshow('abstract_image',abstract_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
