@@ -100,7 +100,7 @@ class Toon:
 					# print(f)
 					ty = [1 if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					I = [fdog[i+p[0]][j+p[1]] if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
-					Hg[i][j] = np.sum(I*f)/np.sum(f*ty)
+					Hg[i][j] = np.sum(I*f)#/np.sum(f*ty)
 					# if(Hg[i][j]) < 0:
 						# print("YES")
 			print(np.sum(np.array(Hg) < 0))
@@ -131,8 +131,9 @@ class Toon:
 							G += g[s]
 						else:
 							break
-					val = H/G
+					val = H#/G
 					# print(val)
+					print(str(val)+" " + str(1+np.tanh(val)))
 					if val<0 and 1+np.tanh(val) < self.config.fdog_threshold:
 						He[i][j] = 0
 					else:
