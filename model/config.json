@@ -1,10 +1,20 @@
 {
 	"version": "baseline",
-	"etf_radius": 5,
+
+	"etf_radius": 4,
 	"etf_iterations": 3,
+
 	"fdog_iterations": 3,
 	"sigma_m": 3.0,
 	"sigma_c": 1.0,
 	"rho": 0.99,
-	"fdog_threshold": 1.0
+	"fdog_threshold": 1.0,
+
+	"fbl_iter": 2,
+	"fbl_S": 9,
+	"fbl_T": 3,
+	"fbl_sigma_e": 3.0,
+	"fbl_sigma_g": 1.0,
+	"fbl_r_e": 10.0,
+	"fbl_r_g": 10.0
 }

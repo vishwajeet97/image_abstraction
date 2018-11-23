@@ -38,7 +38,6 @@ def view_vf(vf, ite):
 	plt.axis('off')
 	plt.figimage(visual_vf)
 	dpi = 100
-	print(visual_vf.shape)
 	plt.gcf().set_size_inches((vf.shape[1]/float(dpi),vf.shape[0]/float(dpi)))
 	plt.savefig("etf_iter"+str(ite)+".png",dpi=dpi) 
 
