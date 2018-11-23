@@ -1,18 +1,24 @@
+import os
+import math
+
 import cv2
 import numpy as np
-import src.util as util
-import math
 import pylab as plt
+import scipy.stats
+from bresenham import bresenham
+
+import src.util as util
+
 
 class Toon:
 	def __init__(self, image, config):
 		self.image = image
 		self.config = config
+		self.M, self.N, self.C = image.shape
 
 	def gaussian(self, point, sigma): # eqn (7) in paper #TODO:use some librart
-		# print(point)
-		# print(sigma)
-		print(sigma)
+		# Update: can use scipy.stats.norm
+		# https://stackoverflow.com/questions/12412895/calculate-probability-in-normal-distribution-given-mean-std-in-python/12413491
 		return math.exp(-(point**2)/(2*(sigma**2)))/(math.sqrt(2*math.pi)*sigma)
 
 	def edge_dog(self, t, sigma_c, p): # eqn (8) in paper
@@ -158,6 +164,122 @@ class Toon:
 
 		self.fdog = updated_fdog
 
+	def FlowBilateralFilter(self):
+		def getNextPointInDirection(point, direction):
+			"""
+			point is a tuple
+			direction is a tuple with magnitude 1
+			"""
+			x, y = point
+			# print(point)
+			dx, dy = direction
+			# print(direction)
+			nx, ny = x+dx, y+dy
+			# print(nx, ny)
+			return np.array([round(nx), round(ny)])
+
+		def getPointOnLine(point): # 1x1, 3x3, 5x5, 7x7 ....
+			x, y = point
+			dx, dy = self.etf[x][y]
+			dx, dy = -dy, dx
+			px, py = x+2*dx, y+2*dy
+			nx, ny = x-2*dx, y-2*dy
+
+			ppoints = [np.array(p) for p in bresenham(int(x), int(y), int(px), int(py))]
+			npoints = [np.array(p) for p in bresenham(int(x), int(y), int(nx), int(ny))]
+
+			points = list(reversed(list(npoints)[1:self.config.fbl_T//2])) + list(ppoints[:self.config.fbl_T//2])
+			points = [p for p in points if 0 <= p[0] < self.M and 0 <= p[1] < self.N]
+
+			return points
+
+		def getPointOnCurve(point): # 1x1, 3x3, 5x5, 7x7 ....
+			# The points are not going to be in any order whatsoever
+			# Use the array as a unordered set of points on the curve
+			points = []
+			for m in range(-1, 2, 2):
+				npoint = point
+				for s in range(self.config.fbl_S//2):
+					x, y = npoint
+					dx, dy = self.etf[int(x)][int(y)]
+					npoint = getNextPointInDirection((x,y), (m*dx, m*dy))
+					if 0 <= npoint[0] < self.M and 0 <= npoint[1] < self.N:
+						points.append(npoint)
+					else:
+						break
+
+			points.append(point)
+			return points
+
+		def spatialDomainGaussian(point, points, gaussian):
+			# This implementation departs from what is done in FDoG
+			# !!!!IMPORTANT!!!!
+			# gaussian should be applied on the distance rather than s
+			
+			distances = np.linalg.norm(points-point, axis=1)
+
+			return gaussian.pdf(distances)
+
+		def colorDomainGaussian(point, points, gaussian):
+
+			return gaussian.pdf(points-point)
+
+		def filterAlongCurve(image, space_gaussian, color_gaussian):
+			filter_image = np.zeros(image.shape)
+			for i in range(self.M):
+				for j in range(self.N):
+					point = np.array([i,j])
+					points = np.array(getPointOnCurve(point), dtype=np.int64)
+					space_weights = np.array(spatialDomainGaussian(np.array((i,j)), points, space_gaussian))
+					color_weights = np.array(colorDomainGaussian(image[i][j], image[points[:,0], points[:, 1]], color_gaussian))
+					intensities = image[points[:, 0], points[:, 1]]
+
+					filter_image[i][j] = np.einsum('ij,i->j',intensities, (space_weights * color_weights)) / np.sum(space_weights * color_weights)
+
+			return filter_image
+
+		def filterAlongGradient(image, space_gaussian, color_gaussian):
+			filter_image = np.zeros(image.shape)
+			for i in range(self.M):
+				for j in range(self.N):
+					point = np.array([i,j])
+					points = np.array(getPointOnLine(point), dtype=np.int64)
+					space_weights = np.array(spatialDomainGaussian(np.array((i,j)), points, space_gaussian))
+					color_weights = np.array(colorDomainGaussian(image[i][j], image[points[:,0], points[:, 1]], color_gaussian))
+					intensities = image[points[:, 0], points[:, 1]]
+
+					filter_image[i][j] = np.einsum('ij,i->j',intensities, (space_weights * color_weights)) / np.sum(space_weights * color_weights)
+
+			return filter_image
+
+		e_space_gaussian = scipy.stats.norm(0, self.config.fbl_sigma_e)
+		g_space_gaussian = scipy.stats.norm(0, self.config.fbl_sigma_g)
+		e_color_gaussian = scipy.stats.multivariate_normal(mean=np.zeros(3), cov=np.diag([self.config.fbl_r_e]*3))
+		g_color_gaussian = scipy.stats.multivariate_normal(mean=np.zeros(3), cov=np.diag([self.config.fbl_r_g]*3))
+
+		filter_image = np.copy(self.image)
+		for ite in range(self.config.fbl_iter):
+			print("Along curve underway")
+			filter_image = filterAlongCurve(filter_image, e_space_gaussian, e_color_gaussian)
+			plt.bone()
+			plt.clf()
+			plt.axis('off')
+			plt.figimage(filter_image)
+			dpi = 100
+			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
+			plt.savefig("fbl_eiter"+str(ite)+".png",dpi=dpi) 
+			print("Along grad underway")
+			filter_image = filterAlongGradient(filter_image, g_space_gaussian, g_color_gaussian)
+			plt.bone()
+			plt.clf()
+			plt.axis('off')
+			plt.figimage(filter_image)
+			dpi = 100
+			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
+			plt.savefig("fbl_giter"+str(ite)+".png",dpi=dpi) 
+
+		self.smoothing = filter_image
+
 	def ETF(self):
 		smoothen_image = cv2.GaussianBlur(self.image, (5,5), 0, 0, cv2.BORDER_DEFAULT)
 		gray_img = cv2.cvtColor(smoothen_image, cv2.COLOR_BGR2GRAY)
@@ -172,7 +294,7 @@ class Toon:
 		vector_field = np.stack([x, y], axis=2)
 
 		KERNEL_SIZE = 9
-		KSby2 = int((KERNEL_SIZE - 1)/2)
+		KSby2 = self.config.etf_radius
 		H, W, C = self.image.shape
 
 		indices = np.indices([H, W]).transpose((1,2,0))
@@ -183,6 +305,9 @@ class Toon:
 
 		updated_vf = np.zeros(vector_field.shape)
 		for iter_no in range(self.config.etf_iterations):
+			"""
+			padded_mag = cv2.copyMakeBorder()
+			"""
 			for i in range(self.image.shape[0]):
 				for j in range(self.image.shape[1]):
 					min_x, max_x = max(i-KSby2,0), min(i+KSby2+1, H)
@@ -209,8 +334,14 @@ class Toon:
 		self.etf = updated_vf
 
 	def run(self):
-		self.ETF()
-		self.FDOG()
-		return self.etf
+		if os.path.isfile('etf_elvis.npy'):
+			self.etf = np.load('etf.npy')
+		else:
+			self.ETF()
+			np.save("etf_elvis.npy", self.etf)
+		# self.FDOG()
+		# self.etf = np.zeros([self.M, self.N, 2])
+		self.FlowBilateralFilter()
+		return self.smoothing
 
 
