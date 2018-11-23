@@ -25,7 +25,7 @@ if __name__ == "__main__":
     toon = Toon(image, config)
     abstract_image = toon.run()
 
-    cv2.imshow('image',image)
+    # cv2.imshow('image',image)
     # cv2.imshow('abstract_image',abstract_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()

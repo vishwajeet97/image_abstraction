@@ -33,7 +33,7 @@ def view_vf(vf, ite):
 	plt.figimage(visual_vf)
 	dpi = 100
 	plt.gcf().set_size_inches((vf.shape[1]/float(dpi),vf.shape[0]/float(dpi)))
-	plt.savefig("etf_iter"+str(ite)+".png",dpi=dpi) 
+	plt.savefig("results/etf_iter"+str(ite)+".png",dpi=dpi) 
 
 def view_magvf(vf):
 	cv2.imshow('image1',np.linalg.norm(vf,axis=2))
