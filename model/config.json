@@ -5,6 +5,6 @@
 	"fdog_iterations": 3,
 	"sigma_m": 3.0,
 	"sigma_c": 1.0,
-	"rho": 0.997,
-	"fdog_threshold": 1
+	"rho": 0.99,
+	"fdog_threshold": 1.0
 }

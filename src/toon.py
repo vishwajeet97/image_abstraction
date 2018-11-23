@@ -10,9 +10,7 @@ class Toon:
 		self.config = config
 
 	def gaussian(self, point, sigma): # eqn (7) in paper #TODO:use some librart
-		# print(point)
 		# print(sigma)
-		print(sigma)
 		return math.exp(-(point**2)/(2*(sigma**2)))/(math.sqrt(2*math.pi)*sigma)
 
 	def edge_dog(self, t, sigma_c, p): # eqn (8) in paper
@@ -57,60 +55,82 @@ class Toon:
 			point[0] = math.floor(slope_+0.5)
 		return point
 
-	def getF(self,size): #1X1 3X3 5X5 7X7
+	def getF(self): #1X1 3X3 5X5 7X7
 		sigma_c = self.config.sigma_c
 		p = self.config.rho
-		points = np.zeros((size))
-		points[0] = self.edge_dog(0,sigma_c,p)
-		for i in range(1, size//2 + 1):
-			print(i)
-			points[i] = self.edge_dog(i,sigma_c,p); #repititive calc TODO
-			print(points[i])
-			points[size-i] = points[i]
+		points = []
+		t = 0
+		points.append(self.edge_dog(t,sigma_c,p))
+		t += 1
+		while True:
+			c = self.gaussian(t, sigma_c) 
+			s = self.gaussian(t, 1.6*sigma_c)
+			if s < 0.001:
+				break
+			points.append(c - s*p)
+			t += 1
+		size = len(points)
+		i = size-1
+		while i != 0:
+			points.append(points[i])
+			i-=1
 		return points
 
-	def getG(self,size): #1X1 3X3 5X5 7X7
+	def getG(self): #1X1 3X3 5X5 7X7
 		sigma_m = self.config.sigma_m
-		points = np.zeros((size))
-		points[0] = self.gaussian(0,sigma_m)
-		for i in range(1, size//2 + 1):
-			points[i] = self.gaussian(i,sigma_m); #repititive calc TODO
-			points[size-i] = points[i]
+		points = []
+		t = 0
+		points.append(self.gaussian(0,sigma_m))
+		t += 1
+		while True:
+			m = self.gaussian(t,sigma_m)
+			if m < 0.001:
+				break
+			points.append(m)
+			t += 1
+		size = len(points)
+		i = size-1
+		while i != 0:
+			points.append(points[i])
+			i-=1
 		return points
 
 	def FDOG(self):
-		# fdog = np.copy(self.preProcess/255) #cloning problem?
 		img = np.float64(self.preProcess)/255
 		fdog = np.copy(img)
 		updated_fdog = np.zeros(fdog.shape)
 		M = self.image.shape[0]
 		N = self.image.shape[1]
-		kernel_size = 7 #7? need to fix the size acc. to sigma_c
-		f = self.getF(kernel_size)
-		g = self.getG(kernel_size)
+		f = np.array(self.getF())
+		f_kernel_size = f.shape[0]
+		print(f_kernel_size)
 		print(f)
+		g = np.array(self.getG())
+		g_kernel_size = g.shape[0]
+		print(g_kernel_size)
 		print(g)
+
 		for iter_no in range(self.config.fdog_iterations):
 			Hg = np.zeros(fdog.shape)
 			for i in range(M):
 				for j in range(N):
 					t0 = self.etf[i][j]
 					direc = math.atan2(t0[0],-t0[1]);
-					points = self.getPointsOnLine(direc, kernel_size).astype(np.int)
+					points = self.getPointsOnLine(direc, f_kernel_size).astype(np.int)
 					# print(f)
 					ty = [1 if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					I = [fdog[i+p[0]][j+p[1]] if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
-					Hg[i][j] = np.sum(I*f)#/np.sum(f*ty)
+					Hg[i][j] = np.sum(I*f)/np.sum(f*ty)
 					# if(Hg[i][j]) < 0:
 						# print("YES")
-			print(np.sum(np.array(Hg) < 0))
+			# print(np.sum(np.array(Hg) < 0))
 			He = np.zeros(fdog.shape)
 			for i in range(M):
 				for j in range(N):
 					point = np.array([i,j])
 					H = Hg[point[0]][point[1]]*g[0]
 					G = g[0]
-					for s in range(1,4):
+					for s in range(1,g_kernel_size//2+1):
 						s_etf = self.etf[point[0]][point[1]]
 						direc = math.atan2(s_etf[1],s_etf[0])
 						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
@@ -121,7 +141,7 @@ class Toon:
 						else:
 							break
 					point = np.array([i,j])
-					for s in range(1,4):
+					for s in range(1,g_kernel_size//2+1):
 						s_etf = self.etf[point[0]][point[1]]
 						direc = math.atan2(-s_etf[1],-s_etf[0])
 						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
@@ -131,23 +151,29 @@ class Toon:
 							G += g[s]
 						else:
 							break
-					val = H#/G
+					val = H/G
 					# print(val)
-					print(str(val)+" " + str(1+np.tanh(val)))
-					if val<0 and 1+np.tanh(val) < self.config.fdog_threshold:
-						He[i][j] = 0
+					# print(str(val)+" " + str(1+np.tanh(val)))
+					if val<=0.01:
+						He[i][j] = 1+np.tanh(min(val,0))
 					else:
-						He[i][j] = 255
-			print(np.sum(np.array(He) > 0))
-			updated_fdog = He
-			fdog = np.minimum(updated_fdog/255, img)
+						He[i][j] = 1
+			He = cv2.normalize(He, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
+			print("num 0 in He" + str(np.sum(np.array(He) > 0)))
+			# updated_fdog = He
+			for i in range(M):
+				for j in range(N):
+					updated_fdog[i][j] = 0 if He[i][j] <= self.config.fdog_threshold else 255
+					if updated_fdog[i][j]==0:
+						fdog[i][j] = 0
+			fdog = cv2.GaussianBlur(fdog, (5,5), 0, 0, cv2.BORDER_DEFAULT)
+			# fdog = np.minimum(updated_fdog/255, img)
 			plt.bone()
 			plt.clf()
 			plt.axis('off')
 			plt.figimage(updated_fdog)
 			dpi = 100
-			print(updated_fdog.shape)
 			plt.gcf().set_size_inches((updated_fdog.shape[1]/float(dpi),updated_fdog.shape[0]/float(dpi)))
 			plt.savefig("fdog_iter"+str(iter_no)+".png",dpi=dpi) 
 		# cv2.imshow('image',updated_fdog)
@@ -172,7 +198,7 @@ class Toon:
 		x, y = cv2.polarToCart(mag, angle, x=None, y=None, angleInDegrees=True)
 		vector_field = np.stack([x, y], axis=2)
 
-		KERNEL_SIZE = 9
+		KERNEL_SIZE = 5
 		KSby2 = int((KERNEL_SIZE - 1)/2)
 		H, W, C = self.image.shape
 
