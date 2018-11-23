@@ -103,10 +103,7 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-<<<<<<< HEAD
 # generated images
 *.png
-=======
 temp/
 results/
->>>>>>> 4f9ab5450ea00c15a61efd621e1395e843b240a0

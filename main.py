@@ -12,8 +12,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Take in the path to config file')
     parser.add_argument("--config_path", type=str, default="model/config.json",
                         help='path to the config file stored in json')
-    parser.add_argument("--image_path", type=str, default="data/elvis.png",
-                        help='path to the image')
+    # parser.add_argument("--image_path", type=str, default="data/parrot.jpg",
+    #                     help='path to the image')
     parser.add_argument("--result_path", type=str, default="result/venice.jpg",
                         help='path to the store location of the abstracted image')
     
@@ -21,7 +21,8 @@ if __name__ == "__main__":
     config = Config(args.config_path)
 
 
-    image = cv2.imread(args.image_path)
+    image = cv2.imread("data/"+config.image_path)
+    config.image_path = config.image_path.split(".", 1)[0]
     toon = Toon(image, config)
     abstract_image = toon.run()
 

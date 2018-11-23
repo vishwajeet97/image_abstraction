@@ -16,7 +16,16 @@ def im2col_sliding_strided(A, BSZ, stepsize=1):
     out_view = np.lib.stride_tricks.as_strided(A, shape=shp, strides=strd)
     return out_view.reshape(nrows, ncols, BSZ[0]*BSZ[1])[:,::stepsize]
 
-def view_vf(vf, ite):
+def save_image(img, img_title, title):
+	plt.bone()
+	plt.clf()
+	plt.axis('off')
+	plt.figimage(img)
+	dpi = 100
+	plt.gcf().set_size_inches((img.shape[1]/float(dpi),img.shape[0]/float(dpi)))
+	plt.savefig("result/"+img_title+"_"+title+".png",dpi=dpi)
+
+def view_vf(vf, ite, img_title):
 	texture = np.random.rand(vf.shape[0],vf.shape[1]).astype(np.float32)
 	kernellen=31
 	kernel = np.sin(np.arange(kernellen)*np.pi/kernellen)
@@ -33,15 +42,10 @@ def view_vf(vf, ite):
 	# cv2.imshow('image1',np.array(visual_vf, dtype = np.uint8 ))
 	# cv2.waitKey(0)
 	# cv2.destroyAllWindows()
-	plt.bone()
-	plt.clf()
-	plt.axis('off')
-	plt.figimage(visual_vf)
-	dpi = 100
-	plt.gcf().set_size_inches((vf.shape[1]/float(dpi),vf.shape[0]/float(dpi)))
-	plt.savefig("etf_iter"+str(ite)+".png",dpi=dpi) 
+	save_image(visual_vf,img_title,"etf_iter_"+str(ite))
 
 def view_magvf(vf):
 	cv2.imshow('image1',np.linalg.norm(vf,axis=2))
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
+

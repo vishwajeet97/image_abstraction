@@ -1,6 +1,6 @@
 {
 	"version": "baseline",
-
+	"image_path": "venice.png",
 	"etf_radius": 4,
 	"etf_iterations": 3,
 
@@ -8,7 +8,7 @@
 	"sigma_m": 3.0,
 	"sigma_c": 1.0,
 	"rho": 0.99,
-	"fdog_threshold": 1.0,
+	"fdog_threshold": 0.5,
 
 	"fbl_iter": 2,
 	"fbl_S": 9,

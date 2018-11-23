@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pylab as plt
 import scipy.stats
-from bresenham import bresenham
+# from bresenham import bresenham
 
 import src.util as util
 
@@ -15,14 +15,6 @@ class Toon:
 		self.image = image
 		self.config = config
 		self.M, self.N, self.C = image.shape
-
-	def gaussian(self, point, sigma): # eqn (7) in paper #TODO:use some librart
-		# TODO: Update: can use scipy.stats.norm
-		# https://stackoverflow.com/questions/12412895/calculate-probability-in-normal-distribution-given-mean-std-in-python/12413491
-		return math.exp(-(point**2)/(2*(sigma**2)))/(math.sqrt(2*math.pi)*sigma)
-
-	def edge_dog(self, t, sigma_c, p): # eqn (8) in paper
-		return self.gaussian(t, sigma_c) - p * self.gaussian(t, 1.6*sigma_c)
 
 	def getPointsOnLine(self, slope, size): #1X1 3X3 5X5 7X7
 		points = np.zeros((size,2))
@@ -34,8 +26,8 @@ class Toon:
 			for x in range(size//2):
 				x += 1
 				y += slope
-				points[i][0] = x
-				points[i][1] = math.floor(y+0.5)
+				points[i][0] = math.floor(y+0.5)
+				points[i][1] = x
 				points[size-i][0] = -points[i][0]
 				points[size-i][1] = -points[i][1]
 				i +=1
@@ -44,8 +36,8 @@ class Toon:
 			for y in range(size//2):
 				x += slope_
 				y += 1
-				points[i][0] = math.floor(x+0.5)
-				points[i][1] = y
+				points[i][0] = y
+				points[i][1] = math.floor(x+0.5)
 				points[size-i][0] = -points[i][0]
 				points[size-i][1] = -points[i][1]
 				i +=1
@@ -55,12 +47,12 @@ class Toon:
 	def getNextPointOnCurve(self, slope): #1X1 3X3 5X5 7X7
 		point = np.zeros((2))
 		if abs(slope)<=1:
-			point[0] = 1
-			point[1] = math.floor(slope+0.5)
+			point[0] = math.floor(slope+0.5)
+			point[1] = 1
 		else:
 			slope_ = 1/slope
-			point[1] = 1
-			point[0] = math.floor(slope_+0.5)
+			point[1] = math.floor(slope_+0.5)
+			point[0] = 1
 		return point
 
 	def getF(self): #1X1 3X3 5X5 7X7
@@ -68,30 +60,40 @@ class Toon:
 		p = self.config.rho
 		points = []
 		t = 0
-		points.append(self.edge_dog(t,sigma_c,p))
+		distrib_c = scipy.stats.norm(0, sigma_c)
+		distrib_s = scipy.stats.norm(0, 1.6*sigma_c)
+		points.append([distrib_c.pdf(t),distrib_s.pdf(t)])
 		t += 1
 		while True:
-			c = self.gaussian(t, sigma_c) 
-			s = self.gaussian(t, 1.6*sigma_c)
+			c = distrib_c.pdf(t)
+			s = distrib_s.pdf(t)
 			if s < 0.001:
 				break
-			points.append(c - s*p)
+			points.append([c, s])
 			t += 1
 		size = len(points)
 		i = size-1
 		while i != 0:
 			points.append(points[i])
 			i-=1
+		np_points = np.array(points)
+		sum_gauss = np.sum(np_points,axis=0)
+		p = sum_gauss[1]/sum_gauss[0]
+		points = [pt[0]-p*pt[1] for pt in points]
+		print(p)
+		print(points)
+		print(np.sum(np.array(points)))
 		return points
 
 	def getG(self): #1X1 3X3 5X5 7X7
 		sigma_m = self.config.sigma_m
 		points = []
 		t = 0
-		points.append(self.gaussian(0,sigma_m))
+		distrib = scipy.stats.norm(0, sigma_m)
+		points.append(distrib.pdf(t))
 		t += 1
 		while True:
-			m = self.gaussian(t,sigma_m)
+			m = distrib.pdf(t)
 			if m < 0.001:
 				break
 			points.append(m)
@@ -125,7 +127,7 @@ class Toon:
 					t0 = self.etf[i][j]
 					direc = math.atan2(t0[0],-t0[1]);
 					points = self.getPointsOnLine(direc, f_kernel_size).astype(np.int)
-					# print(f)
+					# print(str(direc)+" "+str(points))
 					ty = [1 if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					I = [fdog[i+p[0]][j+p[1]] if i+p[0]<M and i+p[0]>=0 and j+p[1]<N and j+p[1]>=0 else 0 for p in points]
 					Hg[i][j] = np.sum(I*f)/np.sum(f*ty)
@@ -162,8 +164,8 @@ class Toon:
 					val = H/G
 					# print(val)
 					# print(str(val)+" " + str(1+np.tanh(val)))
-					if val<=0.01:
-						He[i][j] = 1+np.tanh(min(val,0))
+					if val<0:
+						He[i][j] = 1+np.tanh(val)
 					else:
 						He[i][j] = 1
 			He = cv2.normalize(He, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
@@ -172,25 +174,12 @@ class Toon:
 			# updated_fdog = He
 			for i in range(M):
 				for j in range(N):
-					updated_fdog[i][j] = 0 if He[i][j] <= self.config.fdog_threshold else 255
+					updated_fdog[i][j] = 0 if He[i][j] < self.config.fdog_threshold else 255
 					if updated_fdog[i][j]==0:
 						fdog[i][j] = 0
-			fdog = cv2.GaussianBlur(fdog, (5,5), 0, 0, cv2.BORDER_DEFAULT)
-			# fdog = np.minimum(updated_fdog/255, img)
-			plt.bone()
-			plt.clf()
-			plt.axis('off')
-			plt.figimage(updated_fdog)
-			dpi = 100
-			plt.gcf().set_size_inches((updated_fdog.shape[1]/float(dpi),updated_fdog.shape[0]/float(dpi)))
-			plt.savefig("fdog_iter"+str(iter_no)+".png",dpi=dpi) 
-		# cv2.imshow('image',updated_fdog)
-		# # cv2.imshow('abstract_image',abstract_image)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
-
-		
-
+			fdog = cv2.GaussianBlur(fdog, (3,3), 0, 0, cv2.BORDER_DEFAULT)
+			util.save_image(updated_fdog,self.config.image_path,"fdog_iter_"+str(iter_no+1))
+			util.save_image(fdog,self.config.image_path,"superimpose_iter_"+str(iter_no+1))
 		self.fdog = updated_fdog
 
 	def FlowBilateralFilter(self):
@@ -309,10 +298,13 @@ class Toon:
 
 		self.smoothing = filter_image
 
-	def ETF(self):
+	def preProcess(self):
 		smoothen_image = cv2.GaussianBlur(self.image, (5,5), 0, 0, cv2.BORDER_DEFAULT)
 		gray_img = cv2.cvtColor(smoothen_image, cv2.COLOR_BGR2GRAY)
 		self.preProcess = gray_img
+
+	def ETF(self):
+		gray_img = self.preProcess
 		sobelx = cv2.Sobel(gray_img,cv2.CV_32F,1,0,ksize=3)
 		sobely = cv2.Sobel(gray_img,cv2.CV_32F,0,1,ksize=3)
 
@@ -328,7 +320,7 @@ class Toon:
 		indices = np.indices([H, W]).transpose((1,2,0))
 
 		ite = 0
-		util.view_vf(vector_field,ite)
+		util.view_vf(vector_field,ite,self.config.image_path)
 		ite += 1
 
 		updated_vf = np.zeros(vector_field.shape)
@@ -355,21 +347,22 @@ class Toon:
 					if norm != 0:
 						updated_vf[i][j] = updated_vf[i][j]/norm
 			# print(updated_vf)
-			util.view_vf(updated_vf,ite)
+			util.view_vf(updated_vf,ite,self.config.image_path)
 			vector_field = updated_vf
 			ite += 1
 
 		self.etf = updated_vf
 
 	def run(self):
-		if os.path.isfile('etf_elvis.npy'):
-			self.etf = np.load('etf.npy')
+		self.preProcess()
+		if os.path.isfile('result/etf_'+self.config.image_path+'.npy'):
+			self.etf = np.load('result/etf_'+self.config.image_path+'.npy')
 		else:
 			self.ETF()
-			np.save("etf_elvis.npy", self.etf)
-		# self.FDOG()
+			np.save("result/etf_"+self.config.image_path+".npy", self.etf)
+		self.FDOG()
 		# self.etf = np.zeros([self.M, self.N, 2])
-		self.FlowBilateralFilter()
-		return self.smoothing
+		# self.FlowBilateralFilter()
+		return self.etf
 
 
