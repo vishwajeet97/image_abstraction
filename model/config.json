@@ -10,11 +10,17 @@
 	"rho": 0.99,
 	"fdog_threshold": 0.5,
 
-	"fbl_iter": 2,
-	"fbl_S": 9,
+	"fbl_iter": 0,
+	"fbl_S": 7,
 	"fbl_T": 3,
-	"fbl_sigma_e": 3.0,
-	"fbl_sigma_g": 1.0,
+	"fbl_sigma_e": 2.0,
+	"fbl_sigma_g": 0.3,
 	"fbl_r_e": 10.0,
-	"fbl_r_g": 10.0
+	"fbl_r_g": 10.0,
+
+	"fbl_cq_q": 14,
+	"fbl_cq_target_sharp_min": 3.1,
+	"fbl_cq_target_sharp_max": 14.0,
+	"fbl_cq_gradient_min": 0,
+	"fbl_cq_gradient_max": 2
 }

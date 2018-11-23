@@ -38,10 +38,6 @@ def view_vf(vf, ite, img_title):
 	# print(x.shape)
 	# print(y.shape)
 	visual_vf = lic_internal.line_integral_convolution(x, y, texture, kernel)
-	# print(np.sum(np.where(visual_vf>0,1,0)))
-	# cv2.imshow('image1',np.array(visual_vf, dtype = np.uint8 ))
-	# cv2.waitKey(0)
-	# cv2.destroyAllWindows()
 	save_image(visual_vf,img_title,"etf_iter_"+str(ite))
 
 def view_magvf(vf):

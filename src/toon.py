@@ -249,6 +249,7 @@ class Toon:
 					point = np.array([i,j])
 					points = np.array(getPointOnCurve(point), dtype=np.int64)
 					space_weights = np.array(spatialDomainGaussian(np.array((i,j)), points, space_gaussian))
+
 					color_weights = np.array(colorDomainGaussian(image[i][j], image[points[:,0], points[:, 1]], color_gaussian))
 					intensities = image[points[:, 0], points[:, 1]]
 
@@ -270,6 +271,25 @@ class Toon:
 
 			return filter_image
 
+		def colorQuantization(image):
+			config = self.config
+			lab_space = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+			gray_img = lab_space[:,:,0]
+			sobelx = cv2.Sobel(gray_img,cv2.CV_32F,1,0,ksize=3)
+			sobely = cv2.Sobel(gray_img,cv2.CV_32F,0,1,ksize=3)
+
+			mag, angle = cv2.cartToPolar(sobelx, sobely, magnitude=None, angle=None, angleInDegrees=True)
+			mag = np.clip(mag, a_min=config.fbl_cq_gradient_min, a_max=config.fbl_cq_gradient_max)
+			phi_q = np.interp(mag, [config.fbl_cq_gradient_min,config.fbl_cq_gradient_max],[config.fbl_cq_target_sharp_min,config.fbl_cq_target_sharp_max])
+
+			x = gray_img.astype(np.uint8)
+			q_nearest = x - x%config.fbl_cq_q + np.around(2*(x%config.fbl_cq_q)/config.fbl_cq_q)*(config.fbl_cq_q/2)
+			
+			final_image = q_nearest + (config.fbl_cq_q/2)*np.tanh(np.multiply(phi_q, gray_img-q_nearest))
+			lab_space[:,:,0] = final_image.astype(np.uint8)
+
+			return cv2.cvtColor(lab_space, cv2.COLOR_LAB2BGR)
+
 		e_space_gaussian = scipy.stats.norm(0, self.config.fbl_sigma_e)
 		g_space_gaussian = scipy.stats.norm(0, self.config.fbl_sigma_g)
 		e_color_gaussian = scipy.stats.multivariate_normal(mean=np.zeros(3), cov=np.diag([self.config.fbl_r_e]*3))
@@ -278,25 +298,34 @@ class Toon:
 		filter_image = np.copy(self.image)
 		for ite in range(self.config.fbl_iter):
 			print("Along curve underway")
-			filter_image = filterAlongCurve(filter_image, e_space_gaussian, e_color_gaussian)
+			filter_image = filterAlongCurve(filter_image.astype(np.float64), e_space_gaussian, e_color_gaussian).astype(np.uint8)
 			plt.bone()
 			plt.clf()
 			plt.axis('off')
-			plt.figimage(filter_image)
+			plt.figimage(cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB))
 			dpi = 100
 			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
-			plt.savefig("fbl_eiter"+str(ite)+".png",dpi=dpi) 
+			plt.savefig("results/fbl_eiter"+str(ite)+".png",dpi=dpi) 
+			# print(np.sum(np.linalg.norm(filter_image-self.image.astype(np.float64))))
 			print("Along grad underway")
-			filter_image = filterAlongGradient(filter_image, g_space_gaussian, g_color_gaussian)
+			filter_image = filterAlongGradient(filter_image.astype(np.float64), g_space_gaussian, g_color_gaussian).astype(np.uint8)
 			plt.bone()
 			plt.clf()
 			plt.axis('off')
-			plt.figimage(filter_image)
+			plt.figimage(cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB))
 			dpi = 100
 			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
-			plt.savefig("fbl_giter"+str(ite)+".png",dpi=dpi) 
+			plt.savefig("results/fbl_giter"+str(ite)+".png",dpi=dpi) 
 
-		self.smoothing = filter_image
+		image = cv2.imread('results/fbl_giter4.png')
+		self.smoothing = colorQuantization(image)
+		plt.bone()
+		plt.clf()
+		plt.axis('off')
+		plt.figimage(cv2.cvtColor(self.smoothing, cv2.COLOR_BGR2RGB))
+		dpi = 100
+		plt.gcf().set_size_inches((self.smoothing.shape[1]/float(dpi),self.smoothing.shape[0]/float(dpi)))
+		plt.savefig("results/fbl_quantize_elvis"+".png",dpi=dpi)
 
 	def preProcess(self):
 		smoothen_image = cv2.GaussianBlur(self.image, (5,5), 0, 0, cv2.BORDER_DEFAULT)
