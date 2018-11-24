@@ -105,5 +105,6 @@ venv.bak/
 
 # generated images
 *.png
+*.npy
 temp/
 results/
