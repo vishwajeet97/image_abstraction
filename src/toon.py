@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pylab as plt
 import scipy.stats
-# from bresenham import bresenham
+from bresenham import bresenham
 
 import src.util as util
 
@@ -64,6 +64,7 @@ class Toon:
 		distrib_s = scipy.stats.norm(0, 1.6*sigma_c)
 		points.append([distrib_c.pdf(t),distrib_s.pdf(t)])
 		t += 1
+		# while t<5:
 		while True:
 			c = distrib_c.pdf(t)
 			s = distrib_s.pdf(t)
@@ -92,6 +93,7 @@ class Toon:
 		distrib = scipy.stats.norm(0, sigma_m)
 		points.append(distrib.pdf(t))
 		t += 1
+		# while t<5:
 		while True:
 			m = distrib.pdf(t)
 			if m < 0.001:
@@ -168,10 +170,11 @@ class Toon:
 						He[i][j] = 1+np.tanh(val)
 					else:
 						He[i][j] = 1
-			He = cv2.normalize(He, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+			# He = cv2.normalize(He, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
 			print("num 0 in He" + str(np.sum(np.array(He) > 0)))
 			# updated_fdog = He
+			np.save("result/fdog1_"+self.config.image_path+".npy", He)
 			for i in range(M):
 				for j in range(N):
 					updated_fdog[i][j] = 0 if He[i][j] < self.config.fdog_threshold else 255
@@ -183,60 +186,74 @@ class Toon:
 		self.fdog = updated_fdog
 
 	def FlowBilateralFilter(self):
-		def getNextPointInDirection(point, direction):
-			"""
-			point is a tuple
-			direction is a tuple with magnitude 1
-			"""
-			x, y = point
-			# print(point)
-			dx, dy = direction
-			# print(direction)
-			nx, ny = x+dx, y+dy
-			# print(nx, ny)
-			return np.array([round(nx), round(ny)])
+		# def getNextPointInDirection(point, direction):
+		# 	"""
+		# 	point is a tuple
+		# 	direction is a tuple with magnitude 1
+		# 	"""
+		# 	x, y = point
+		# 	# print(point)
+		# 	dx, dy = direction
+		# 	# print(direction)
+		# 	nx, ny = x+dx, y+dy
+		# 	# print(nx, ny)
+		# 	return np.array([round(nx), round(ny)])
 
-		def getPointOnLine(point): # 1x1, 3x3, 5x5, 7x7 ....
-			x, y = point
-			dx, dy = self.etf[x][y]
-			dx, dy = -dy, dx
-			px, py = x+2*dx, y+2*dy
-			nx, ny = x-2*dx, y-2*dy
+		# def getPointOnLine(point): # 1x1, 3x3, 5x5, 7x7 ....
+		# 	x, y = point
+		# 	dx, dy = self.etf[x][y]
+		# 	dx, dy = -dy, dx
+		# 	px, py = x+2*dx, y+2*dy
+		# 	nx, ny = x-2*dx, y-2*dy
 
-			ppoints = [np.array(p) for p in bresenham(int(x), int(y), int(px), int(py))]
-			npoints = [np.array(p) for p in bresenham(int(x), int(y), int(nx), int(ny))]
+		# 	ppoints = [np.array(p) for p in bresenham(int(x), int(y), int(px), int(py))]
+		# 	npoints = [np.array(p) for p in bresenham(int(x), int(y), int(nx), int(ny))]
 
-			points = list(reversed(list(npoints)[1:self.config.fbl_T//2])) + list(ppoints[:self.config.fbl_T//2])
-			points = [p for p in points if 0 <= p[0] < self.M and 0 <= p[1] < self.N]
+		# 	points = list(reversed(list(npoints)[1:self.config.fbl_T//2])) + list(ppoints[:self.config.fbl_T//2])
+		# 	points = [p for p in points if 0 <= p[0] < self.M and 0 <= p[1] < self.N]
 
-			return points
+		# 	return points
 
-		def getPointOnCurve(point): # 1x1, 3x3, 5x5, 7x7 ....
-			# The points are not going to be in any order whatsoever
-			# Use the array as a unordered set of points on the curve
-			points = []
-			for m in range(-1, 2, 2):
-				npoint = point
-				for s in range(self.config.fbl_S//2):
-					x, y = npoint
-					dx, dy = self.etf[int(x)][int(y)]
-					npoint = getNextPointInDirection((x,y), (m*dx, m*dy))
-					if 0 <= npoint[0] < self.M and 0 <= npoint[1] < self.N:
-						points.append(npoint)
-					else:
-						break
+		# def getPointOnCurve(point): # 1x1, 3x3, 5x5, 7x7 ....
+		# 	# The points are not going to be in any order whatsoever
+		# 	# Use the array as a unordered set of points on the curve
+		# 	points = []
+		# 	for m in range(-1, 2, 2):
+		# 		npoint = point
+		# 		for s in range(self.config.fbl_S//2):
+		# 			x, y = npoint
+		# 			dx, dy = self.etf[int(x)][int(y)]
+		# 			npoint = getNextPointInDirection((x,y), (m*dx, m*dy))
+		# 			if 0 <= npoint[0] < self.M and 0 <= npoint[1] < self.N:
+		# 				points.append(npoint)
+		# 			else:
+		# 				break
 
-			points.append(point)
-			return points
+		# 	points.append(point)
+		# 	return points
 
-		def spatialDomainGaussian(point, points, gaussian):
+		def spatialDomainGaussian(space_gaussian):
 			# This implementation departs from what is done in FDoG
 			# !!!!IMPORTANT!!!!
 			# gaussian should be applied on the distance rather than s
 			
-			distances = np.linalg.norm(points-point, axis=1)
-
-			return gaussian.pdf(distances)
+			points = []
+			t = 0
+			points.append(space_gaussian.pdf(t))
+			t += 1
+			# while t<5:
+			while True:
+				m = space_gaussian.pdf(t)
+				if m < 0.001:
+					break
+				points.append(m)
+				t += 1
+			size = len(points)
+			i = size-1
+			while i != 0:
+				points.append(points[i])
+				i-=1
+			return points
 
 		def colorDomainGaussian(point, points, gaussian):
 
@@ -244,17 +261,39 @@ class Toon:
 
 		def filterAlongCurve(image, space_gaussian, color_gaussian):
 			filter_image = np.zeros(image.shape)
+			g = np.array(spatialDomainGaussian(space_gaussian))
+			g_kernel_size = g.shape[0]
+			print(g_kernel_size)
+			print(g)
 			for i in range(self.M):
 				for j in range(self.N):
 					point = np.array([i,j])
-					points = np.array(getPointOnCurve(point), dtype=np.int64)
-					space_weights = np.array(spatialDomainGaussian(np.array((i,j)), points, space_gaussian))
-
-					color_weights = np.array(colorDomainGaussian(image[i][j], image[points[:,0], points[:, 1]], color_gaussian))
-					intensities = image[points[:, 0], points[:, 1]]
-
-					filter_image[i][j] = np.einsum('ij,i->j',intensities, (space_weights * color_weights)) / np.sum(space_weights * color_weights)
-
+					H = image[point[0]][point[1]]*g[0]
+					G = g[0]
+					for s in range(1,g_kernel_size//2+1):
+						s_etf = self.etf[point[0]][point[1]]
+						direc = math.atan2(s_etf[1],s_etf[0])
+						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
+						point = point + p_delta
+						if point[0]<self.M and point[0]>=0 and point[1]<self.N and point[1]>=0:
+							color_weights = color_gaussian.pdf(image[i][j]-image[point[0]][point[1]])
+							H += image[point[0]][point[1]]*g[s]*color_weights
+							G += g[s]*color_weights
+						else:
+							break
+					point = np.array([i,j])
+					for s in range(1,g_kernel_size//2+1):
+						s_etf = self.etf[point[0]][point[1]]
+						direc = math.atan2(-s_etf[1],-s_etf[0])
+						p_delta = self.getNextPointOnCurve(direc).astype(np.int)
+						point = point + p_delta
+						if point[0]<self.M and point[0]>=0 and point[1]<self.N and point[1]>=0:
+							color_weights = color_gaussian.pdf(image[i][j]-image[point[0]][point[1]])
+							H += image[point[0]][point[1]]*g[s]*color_weights
+							G += g[s]*color_weights
+						else:
+							break
+					filter_image[i][j] = H/G
 			return filter_image
 
 		def filterAlongGradient(image, space_gaussian, color_gaussian):
@@ -299,33 +338,18 @@ class Toon:
 		for ite in range(self.config.fbl_iter):
 			print("Along curve underway")
 			filter_image = filterAlongCurve(filter_image.astype(np.float64), e_space_gaussian, e_color_gaussian).astype(np.uint8)
-			plt.bone()
-			plt.clf()
-			plt.axis('off')
-			plt.figimage(cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB))
-			dpi = 100
-			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
-			plt.savefig("results/fbl_eiter"+str(ite)+".png",dpi=dpi) 
+			display_img = cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB)
+			util.save_image(display_img,self.config.image_path,"fbl_eiter"+str(ite))
 			# print(np.sum(np.linalg.norm(filter_image-self.image.astype(np.float64))))
 			print("Along grad underway")
 			filter_image = filterAlongGradient(filter_image.astype(np.float64), g_space_gaussian, g_color_gaussian).astype(np.uint8)
-			plt.bone()
-			plt.clf()
-			plt.axis('off')
-			plt.figimage(cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB))
-			dpi = 100
-			plt.gcf().set_size_inches((filter_image.shape[1]/float(dpi),filter_image.shape[0]/float(dpi)))
-			plt.savefig("results/fbl_giter"+str(ite)+".png",dpi=dpi) 
+			display_img = cv2.cvtColor(filter_image, cv2.COLOR_BGR2RGB)
+			util.save_image(display_img,self.config.image_path,"fbl_giter"+str(ite))
 
-		image = cv2.imread('results/fbl_giter4.png')
-		self.smoothing = colorQuantization(image)
-		plt.bone()
-		plt.clf()
-		plt.axis('off')
-		plt.figimage(cv2.cvtColor(self.smoothing, cv2.COLOR_BGR2RGB))
-		dpi = 100
-		plt.gcf().set_size_inches((self.smoothing.shape[1]/float(dpi),self.smoothing.shape[0]/float(dpi)))
-		plt.savefig("results/fbl_quantize_elvis"+".png",dpi=dpi)
+		# image = cv2.imread('results/fbl_giter4.png')
+		self.smoothing = colorQuantization(filter_image)
+		display_img = cv2.cvtColor(self.smoothing, cv2.COLOR_BGR2RGB)
+		util.save_image(display_img,self.config.image_path,"fbl_quantize")
 
 	def preProcess(self):
 		smoothen_image = cv2.GaussianBlur(self.image, (5,5), 0, 0, cv2.BORDER_DEFAULT)
@@ -382,6 +406,35 @@ class Toon:
 
 		self.etf = updated_vf
 
+	def thresholding(self,value):
+		He = np.load("result/fdog1_"+self.config.image_path+".npy")[:,:,0]
+		updated_fdog = np.zeros(He.shape)
+		print(He)
+		for i in range(He.shape[0]):
+			for j in range(He.shape[1]):
+				updated_fdog[i][j] = 0 if He[i][j] < value else 255
+		updated_fdog = 255 - updated_fdog
+		self.fdog = updated_fdog
+		# updated_fdog = cv2.GaussianBlur(updated_fdog, (3,3), 0, 0, cv2.BORDER_DEFAULT)
+		util.save_image(updated_fdog,self.config.image_path,"fdog_iter_"+str(0+1))
+
+	def combine_image(self):
+		# self.output = np.zeros(self.image.shape)
+		temp = np.where(self.fdog==0,0,1)
+		print(np.sum(temp))
+		print(np.sum(self.fdog))
+		print(self.fdog)
+		self.output = np.einsum("ij,ijk->ijk",temp,self.smoothing).astype(np.uint8)
+		self.output = cv2.cvtColor(self.output, cv2.COLOR_BGR2RGB)
+		# for i in range(self.image.shape[0]):
+		# 	for j in range(self.image.shape[1]):
+		# 		if self.fdog[i][j]=0:
+		# 			self.output[i][j] = 0
+		# 		else:
+		# 			self.output[i][j] = self.smoothing[i][j]
+		util.save_image(self.output,self.config.image_path,"final")
+
+
 	def run(self):
 		self.preProcess()
 		if os.path.isfile('result/etf_'+self.config.image_path+'.npy'):
@@ -389,9 +442,15 @@ class Toon:
 		else:
 			self.ETF()
 			np.save("result/etf_"+self.config.image_path+".npy", self.etf)
-		self.FDOG()
-		# self.etf = np.zeros([self.M, self.N, 2])
-		# self.FlowBilateralFilter()
-		return self.etf
+		if os.path.isfile('result/fdog1_'+self.config.image_path+'.npy'):
+			self.fdog = np.load('result/fdog1_'+self.config.image_path+'.npy')
+		else:
+			self.FDOG()
+			np.save("result/fdog1_"+self.config.image_path+".npy", self.etf)
+		# self.FDOG()
+		# self.thresholding(0.5)
+		self.FlowBilateralFilter()
+		self.combine_image()
+		return self.output
 
 
