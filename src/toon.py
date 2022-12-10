@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import pylab as plt
 import scipy.stats
-from bresenham import bresenham
+# from bresenham import bresenham
 
 import src.util as util
 
